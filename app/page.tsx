@@ -1,103 +1,181 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ArrowRight, Coffee, Store, Users, TrendingUp, Clock, Award } from 'lucide-react';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  // Handle navigation based on auth state
+  useEffect(() => {
+    if (!isLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, isLoading, router]);
+
+  const goToDashboard = () => {
+    router.push('/dashboard');
+  };
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // If user is authenticated, show nothing (will redirect to dashboard)
+  if (user) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl mx-auto">
+        <Card className="shadow-2xl border backdrop-blur-sm overflow-hidden">
+          <CardHeader className="text-center pb-6 bg-primary text-primary-foreground">
+            {/* Coffee Logo/Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary-foreground/20 backdrop-blur-sm p-4 rounded-full shadow-lg">
+                <Coffee size={48} className="text-primary-foreground" />
+              </div>
+            </div>
+            
+            <CardTitle className="text-4xl font-bold mb-2">
+              BiCafe
+            </CardTitle>
+            <CardDescription className="text-primary-foreground/80 text-lg">
+              Welcome to your coffee shop management system
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="p-8 space-y-8">
+            {/* Status and Time */}
+            <div className="flex justify-between items-center">
+              <Badge variant="secondary" className="px-4 py-2">
+                <Store className="w-4 h-4 mr-2" />
+                Cafe Open
+              </Badge>
+              <div className="flex items-center text-muted-foreground">
+                <Clock className="w-4 h-4 mr-2" />
+                <span className="text-sm">Ready to serve</span>
+              </div>
+            </div>
+
+            {/* Dashboard Button */}
+            <div className="space-y-4">
+              <Button 
+                onClick={goToDashboard}
+                className="w-full font-semibold py-6 px-8 text-lg"
+                size="lg"
+              >
+                <Coffee className="mr-3" size={24} />
+                Go to Dashboard
+                <ArrowRight className="ml-3" size={20} />
+              </Button>
+              
+              <p className="text-sm text-muted-foreground text-center">
+                Access your cafe management tools and analytics
+              </p>
+            </div>
+
+            {/* Feature Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="border hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <TrendingUp className="w-5 h-5 text-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        Sales Analytics
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Track your daily revenue and trends
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <Users className="w-5 h-5 text-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        Customer Management
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Manage orders and customer data
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <Coffee className="w-5 h-5 text-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        Menu & Inventory
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Update menu items and stock levels
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <Award className="w-5 h-5 text-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">
+                        Quality Control
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Maintain high standards and reviews
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Welcome Message */}
+            <Card className="bg-muted/50 border">
+              <CardContent className="p-6 text-center">
+                <h3 className="font-semibold text-foreground mb-2">
+                  Ready to brew success?
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Your complete cafe management solution awaits. Start managing orders, tracking sales, and delighting customers today.
+                </p>
+              </CardContent>
+            </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
