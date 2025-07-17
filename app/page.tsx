@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useAuthStore } from '@/lib/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,20 +10,20 @@ import { ArrowRight, Coffee, Store, Users, TrendingUp, Clock, Award } from 'luci
 
 export default function Home() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuthStore();
 
-  // Handle navigation based on auth state
+  // Redirect đã login về dashboard
   useEffect(() => {
-    if (!isLoading && user) {
+    if (!isLoading && isAuthenticated) {
       router.push('/dashboard');
     }
-  }, [user, isLoading, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   const goToDashboard = () => {
     router.push('/dashboard');
   };
 
-  // Show loading state while checking auth
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -32,8 +32,8 @@ export default function Home() {
     );
   }
 
-  // If user is authenticated, show nothing (will redirect to dashboard)
-  if (user) {
+  // Nếu đã authenticated thì không hiển thị gì (sẽ redirect)
+  if (isAuthenticated) {
     return null;
   }
 

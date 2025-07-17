@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AmplifyProvider } from "@/lib/amplify-provider";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthInitializer } from "@/lib/auth-initializer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,11 +28,12 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <AmplifyProvider>
-          <AuthProvider>
+          <AuthInitializer>
             {children}
-          </AuthProvider>
+          </AuthInitializer>
         </AmplifyProvider>
       </body>
     </html>

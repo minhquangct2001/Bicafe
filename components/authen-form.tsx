@@ -1,27 +1,25 @@
 'use client';
 
-import { useState } from "react";
-import { signIn, signUp, confirmSignUp, resendSignUpCode, resetPassword, confirmResetPassword } from "aws-amplify/auth";
-import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useAuthStore } from "@/lib/auth-store";
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { confirmResetPassword, confirmSignUp, resendSignUpCode, resetPassword, signIn, signUp } from "aws-amplify/auth";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
-  const { checkAuthState } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -33,6 +31,9 @@ export function LoginForm({
   const [confirmationCode, setConfirmationCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
+
+
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
@@ -43,8 +44,6 @@ export function LoginForm({
         username: email,
         password: password,
       });
-      // Cập nhật auth state sau khi đăng nhập thành công
-      await checkAuthState();
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");
