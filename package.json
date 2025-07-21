@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed": "tsx amplify/run-seed.ts seed",
+    "seed:clear": "tsx amplify/run-seed.ts clear"
   },
   "dependencies": {
     "@aws-amplify/adapter-nextjs": "^1.6.6",
@@ -15,6 +17,9 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@faker-js/faker": "^9.9.0",
+    "@hookform/resolvers": "^5.1.1",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-checkbox": "^1.3.2",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -23,6 +28,7 @@
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
@@ -37,6 +43,7 @@
     "next-themes": "^0.4.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-hook-form": "^7.60.0",
     "recharts": "^2.15.4",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",

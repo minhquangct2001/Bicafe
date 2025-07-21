@@ -47,27 +47,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     navMain: [
       {
         title: "Dashboard",
-        url: "#",
+        url: "/dashboard",
         icon: IconDashboard,
       },
       {
-        title: "Lifecycle",
-        url: "#",
+        title: "Product Management",
+        url: "/product",
         icon: IconListDetails,
       },
       {
-        title: "Analytics",
-        url: "#",
+        title: "Menu",
+        url: "/menu",
         icon: IconChartBar,
       },
       {
-        title: "Projects",
-        url: "#",
+        title: "Categories Management",
+        url: "/category",
         icon: IconFolder,
       },
       {
-        title: "Team",
-        url: "#",
+        title: "Order Management",
+        url: "/order",
+        icon: IconUsers,
+      },
+      {
+        title: "My Orders",
+        url: "/orderHistory",
         icon: IconUsers,
       },
     ],

@@ -1,5 +1,4 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
-
 /*== BICAFE SCHEMA (Rút gọn) ==============================================
 Schema cho hệ thống quản lý quán cà phê (Bicafe)
 - Admin: Quản lý menu, đơn hàng, thống kê, kho, nhân viên
@@ -16,6 +15,7 @@ const schema = a.schema({
     role: a.enum(["ADMIN", "USER"]),
     createdAt: a.datetime(),
     updatedAt: a.datetime(),
+    orders: a.hasMany('Order', 'userId'),
   }).authorization(allow => [
     allow.owner(),
     allow.group("admins").to(["read", "update", "delete"])
@@ -29,9 +29,9 @@ const schema = a.schema({
     displayOrder: a.integer().default(0),
     createdAt: a.datetime(),
     updatedAt: a.datetime(),
+    menuItems: a.hasMany('MenuItem', 'categoryId'),
   }).authorization(allow => [
-    allow.authenticated().to(["read"]),
-    allow.group("admins").to(["create", "update", "delete"])
+    allow.authenticated().to(["read", "create", "update", "delete"])
   ]),
 
   // Món ăn / đồ uống
@@ -43,15 +43,11 @@ const schema = a.schema({
     category: a.belongsTo("Category", "categoryId"),
     imageUrl: a.string(),
     isAvailable: a.boolean().default(true),
-    preparationTime: a.integer(),
-    ingredients: a.string().array(),
-    allergens: a.string().array(),
-    calories: a.integer(),
     createdAt: a.datetime(),
     updatedAt: a.datetime(),
+    orderItems: a.hasMany('OrderItem', 'menuItemId'),
   }).authorization(allow => [
-    allow.authenticated().to(["read"]),
-    allow.group("admins").to(["create", "update", "delete"])
+    allow.authenticated().to(["read", "create", "update", "delete"])
   ]),
 
   // Đơn hàng
@@ -72,8 +68,10 @@ const schema = a.schema({
     completedAt: a.datetime(),
     createdAt: a.datetime(),
     updatedAt: a.datetime(),
+    orderItems: a.hasMany('OrderItem', 'orderId'),
   }).authorization(allow => [
-    allow.owner(),
+    allow.authenticated().to(["read", "create"]),
+    allow.owner().to(["read", "update"]),
     allow.group("admins").to(["read", "update", "delete"])
   ]),
 
@@ -89,7 +87,8 @@ const schema = a.schema({
     customizations: a.string(),
     createdAt: a.datetime(),
   }).authorization(allow => [
-    allow.owner(),
+    allow.authenticated().to(["read", "create"]),
+    allow.owner().to(["read", "update"]),
     allow.group("admins").to(["read", "update", "delete"])
   ]),
 
