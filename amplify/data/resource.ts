@@ -19,7 +19,7 @@ const schema = a.schema({
   }).authorization(allow => [
     allow.owner(),
     allow.group("admins").to(["read", "update", "delete"])
-  ]),
+  ],),
 
   // Danh mục món ăn
   Category: a.model({
@@ -55,12 +55,9 @@ const schema = a.schema({
     orderNumber: a.string().required(),
     userId: a.string().required(),
     userProfile: a.belongsTo("UserProfile", "userId"),
-    status: a.enum(["PENDING", "CONFIRMED", "PREPARING", "READY", "COMPLETED", "CANCELLED"]),
+    status: a.enum(["PENDING", "DONE"]),
     totalAmount: a.float().required(),
-    paymentStatus: a.enum(["PENDING", "PAID", "FAILED", "REFUNDED"]),
-    paymentMethod: a.enum(["CASH", "CARD", "MOBILE_PAYMENT"]),
-    orderType: a.enum(["DINE_IN", "TAKEAWAY", "DELIVERY"]),
-    tableNumber: a.string(),
+    floor: a.string(),
     customerName: a.string(),
     customerPhone: a.string(),
     notes: a.string(),
@@ -71,7 +68,7 @@ const schema = a.schema({
     orderItems: a.hasMany('OrderItem', 'orderId'),
   }).authorization(allow => [
     allow.authenticated().to(["read", "create"]),
-    allow.owner().to(["read", "update"]),
+    allow.ownerDefinedIn("userId").to(["read", "update"]),
     allow.group("admins").to(["read", "update", "delete"])
   ]),
 
@@ -93,36 +90,36 @@ const schema = a.schema({
   ]),
 
   // Thống kê doanh thu theo ngày
-  DailySales: a.model({
-    date: a.date().required(),
-    totalOrders: a.integer().default(0),
-    totalRevenue: a.float().default(0),
-    totalItems: a.integer().default(0),
-    averageOrderValue: a.float().default(0),
-    paymentMethodBreakdown: a.string(),
-    statusBreakdown: a.string(),
-    topSellingItems: a.string(),
-    createdAt: a.datetime(),
-    updatedAt: a.datetime(),
-  }).authorization(allow => [
-    allow.group("admins").to(["create", "read", "update", "delete"])
-  ]),
+  DailySales: a
+    .model({
+      date: a.date().required(),
+      totalRevenue: a.float().required(),
+      orderCount: a.integer().required(),
+      averageOrderValue: a.float().required(),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization(allow => [
+      allow.authenticated().to(["read", "create", "update"]),
+      allow.group("admins").to(["read", "create", "update", "delete"])
+    ]),
 
   // Thống kê doanh thu theo tháng
-  MonthlySales: a.model({
-    year: a.integer().required(),
-    month: a.integer().required(),
-    totalOrders: a.integer().default(0),
-    totalRevenue: a.float().default(0),
-    totalItems: a.integer().default(0),
-    averageOrderValue: a.float().default(0),
-    growthRate: a.float(),
-    topCategories: a.string(),
-    createdAt: a.datetime(),
-    updatedAt: a.datetime(),
-  }).authorization(allow => [
-    allow.group("admins").to(["create", "read", "update", "delete"])
-  ]),
+  MonthlySales: a
+    .model({
+      year: a.integer().required(),
+      month: a.integer().required(),
+      totalRevenue: a.float().required(),
+      orderCount: a.integer().required(),
+      averageOrderValue: a.float().required(),
+      growthRate: a.float(),
+      createdAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .authorization(allow => [
+      allow.authenticated().to(["read", "create", "update"]),
+      allow.group("admins").to(["read", "create", "update", "delete"])
+    ]),
 
   // Quản lý tồn kho
   Inventory: a.model({

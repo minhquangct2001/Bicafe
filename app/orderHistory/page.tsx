@@ -1,17 +1,12 @@
 "use client"
 
-import * as React from "react"
-import { generateClient } from "aws-amplify/data"
 import { type Schema } from "@/amplify/data/resource"
 import { AppSidebar } from '@/components/app-sidebar'
 import { ProtectedRoute } from '@/components/protected-route'
 import { SiteHeader } from '@/components/site-header'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import Loading from '../product/loading'
 import {
   Dialog,
   DialogContent,
@@ -19,6 +14,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import {
   Table,
   TableBody,
@@ -27,46 +32,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { 
-  IconRefresh, 
-  IconEye,
-  IconPhone,
-  IconCreditCard,
-  IconCash,
-  IconDeviceMobile,
-  IconHistory,
-  IconShoppingBag,
+import { useAuthStore } from '@/lib/auth-store'
+import {
   IconCalendar,
-  IconClock
+  IconClock,
+  IconCreditCard,
+  IconHistory,
+  IconPhone,
+  IconRefresh,
+  IconShoppingBag
 } from "@tabler/icons-react"
-import { toast } from "sonner"
-import { 
+import {
   ColumnDef,
+  ColumnFiltersState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
-  ColumnFiltersState,
   SortingState,
+  useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { useAuthStore } from '@/lib/auth-store'
-import { Separator } from "@/components/ui/separator"
+import { generateClient } from "aws-amplify/data"
+import * as React from "react"
+import { toast } from "sonner"
+import Loading from '../product/loading'
 
 const client = generateClient<Schema>()
 
@@ -76,13 +67,12 @@ interface OrderWithItems {
   userId: string
   status: string | null
   totalAmount: number
-  paymentStatus: string | null
-  paymentMethod: string | null
-  orderType: string | null
-  tableNumber: string | null
+  floor: string | null
   customerName: string | null
   customerPhone: string | null
   notes: string | null
+  estimatedCompletionTime: string | null
+  completedAt: string | null
   createdAt: string
   updatedAt: string
   orderItems?: Array<{
@@ -130,47 +120,11 @@ function OrderDetailsDialog({
   const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
       case 'PENDING':
-        return 'secondary'
-      case 'CONFIRMED':
-        return 'default'
-      case 'PREPARING':
         return 'outline'
-      case 'READY':
+      case 'DONE':
         return 'default'
-      case 'COMPLETED':
-        return 'default'
-      case 'CANCELLED':
-        return 'destructive'
       default:
         return 'secondary'
-    }
-  }
-
-  const getPaymentStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case 'PENDING':
-        return 'secondary'
-      case 'PAID':
-        return 'default'
-      case 'FAILED':
-        return 'destructive'
-      case 'REFUNDED':
-        return 'outline'
-      default:
-        return 'secondary'
-    }
-  }
-
-  const getPaymentMethodIcon = (method: string) => {
-    switch (method) {
-      case 'CASH':
-        return <IconCash className="h-4 w-4" />
-      case 'CARD':
-        return <IconCreditCard className="h-4 w-4" />
-      case 'MOBILE_PAYMENT':
-        return <IconDeviceMobile className="h-4 w-4" />
-      default:
-        return <IconCreditCard className="h-4 w-4" />
     }
   }
 
@@ -199,12 +153,14 @@ function OrderDetailsDialog({
                   {order.status || 'PENDING'}
                 </Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Payment:</span>
-                <Badge variant={getPaymentStatusBadgeVariant(order.paymentStatus || 'PENDING')}>
-                  {order.paymentStatus || 'PENDING'}
-                </Badge>
-              </div>
+              {order.floor && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Floor:</span>
+                  <Badge variant="outline">
+                    {order.floor}
+                  </Badge>
+                </div>
+              )}
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold">{formatPrice(order.totalAmount)}</div>
@@ -225,22 +181,27 @@ function OrderDetailsDialog({
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Order Type:</span>
-                  <span className="font-medium">{order.orderType?.replace('_', ' ') || 'DINE IN'}</span>
+                  <span className="text-muted-foreground">Order Number:</span>
+                  <span className="font-medium">{order.orderNumber}</span>
                 </div>
-                {order.tableNumber && (
+                {order.floor && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Table:</span>
-                    <span className="font-medium">{order.tableNumber}</span>
+                    <span className="text-muted-foreground">Floor:</span>
+                    <span className="font-medium">{order.floor}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Payment Method:</span>
-                  <div className="flex items-center gap-1">
-                    {getPaymentMethodIcon(order.paymentMethod || 'CASH')}
-                    <span className="font-medium">{order.paymentMethod?.replace('_', ' ') || 'CASH'}</span>
+                {order.estimatedCompletionTime && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Estimated Completion:</span>
+                    <span className="font-medium">{formatDate(order.estimatedCompletionTime)}</span>
                   </div>
-                </div>
+                )}
+                {order.completedAt && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Completed At:</span>
+                    <span className="font-medium">{formatDate(order.completedAt)}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -368,26 +329,6 @@ function OrderHistoryDataTable({ orders }: {
     }
   }
 
-  const getPaymentStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case 'PENDING':
-        return 'secondary'
-      case 'PAID':
-        return 'default'
-      case 'FAILED':
-        return 'destructive'
-      case 'REFUNDED':
-        return 'outline'
-      default:
-        return 'secondary'
-    }
-  }
-
-  const handleViewDetails = (order: OrderWithItems) => {
-    setSelectedOrder(order)
-    setDetailsOpen(true)
-  }
-
   const columns: ColumnDef<OrderWithItems>[] = [
     {
       accessorKey: "orderNumber",
@@ -397,20 +338,18 @@ function OrderHistoryDataTable({ orders }: {
       ),
     },
     {
-      accessorKey: "orderType",
-      header: "Type",
+      accessorKey: "floor",
+      header: "Floor",
       cell: ({ row }) => {
-        const orderType = row.getValue("orderType") as string
-        const tableNumber = row.original.tableNumber
+        const floor = row.getValue("floor") as string
         return (
           <div>
-            <Badge variant="outline">
-              {orderType?.replace('_', ' ') || 'DINE IN'}
-            </Badge>
-            {tableNumber && (
-              <div className="text-xs text-muted-foreground mt-1">
-                Table: {tableNumber}
-              </div>
+            {floor ? (
+              <Badge variant="outline">
+                Floor: {floor}
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground text-sm">No floor specified</span>
             )}
           </div>
         )
@@ -429,35 +368,16 @@ function OrderHistoryDataTable({ orders }: {
       },
     },
     {
-      accessorKey: "paymentStatus",
-      header: "Payment",
+      accessorKey: "notes",
+      header: "Notes",
       cell: ({ row }) => {
-        const paymentStatus = row.getValue("paymentStatus") as string
-        const paymentMethod = row.original.paymentMethod
-        
-        const getPaymentMethodIcon = (method: string) => {
-          switch (method) {
-            case 'CASH':
-              return <IconCash className="h-4 w-4" />
-            case 'CARD':
-              return <IconCreditCard className="h-4 w-4" />
-            case 'MOBILE_PAYMENT':
-              return <IconDeviceMobile className="h-4 w-4" />
-            default:
-              return <IconCreditCard className="h-4 w-4" />
-          }
-        }
-
+        const notes = row.getValue("notes") as string
         return (
-          <div className="space-y-1">
-            <Badge variant={getPaymentStatusBadgeVariant(paymentStatus)}>
-              {paymentStatus || 'PENDING'}
-            </Badge>
-            {paymentMethod && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                {getPaymentMethodIcon(paymentMethod)}
-                <span>{paymentMethod.replace('_', ' ')}</span>
-              </div>
+          <div className="max-w-32">
+            {notes ? (
+              <span className="text-sm text-muted-foreground">{notes}</span>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">No notes</span>
             )}
           </div>
         )
@@ -494,29 +414,6 @@ function OrderHistoryDataTable({ orders }: {
           <div className="text-sm">
             <div>{formatDate(date)}</div>
           </div>
-        )
-      },
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => {
-        const order = row.original
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <IconEye className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleViewDetails(order)}>
-                <IconEye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         )
       },
     },
@@ -731,13 +628,12 @@ const Page = () => {
                 userId: order.userId,
                 status: order.status,
                 totalAmount: order.totalAmount,
-                paymentStatus: order.paymentStatus,
-                paymentMethod: order.paymentMethod,
-                orderType: order.orderType,
-                tableNumber: order.tableNumber,
+                floor: order.floor,
                 customerName: order.customerName,
                 customerPhone: order.customerPhone,
                 notes: order.notes,
+                estimatedCompletionTime: order.estimatedCompletionTime,
+                completedAt: order.completedAt,
                 createdAt: order.createdAt || new Date().toISOString(),
                 updatedAt: order.updatedAt || new Date().toISOString(),
                 orderItems: orderItemsWithMenuItems
@@ -750,13 +646,12 @@ const Page = () => {
                 userId: order.userId,
                 status: order.status,
                 totalAmount: order.totalAmount,
-                paymentStatus: order.paymentStatus,
-                paymentMethod: order.paymentMethod,
-                orderType: order.orderType,
-                tableNumber: order.tableNumber,
+                floor: order.floor,
                 customerName: order.customerName,
                 customerPhone: order.customerPhone,
                 notes: order.notes,
+                estimatedCompletionTime: order.estimatedCompletionTime,
+                completedAt: order.completedAt,
                 createdAt: order.createdAt || new Date().toISOString(),
                 updatedAt: order.updatedAt || new Date().toISOString(),
                 orderItems: []

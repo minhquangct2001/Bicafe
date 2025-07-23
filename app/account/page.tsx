@@ -77,7 +77,7 @@ const AccountPage = () => {
 
       if (orders) {
         const totalOrders = orders.length
-        const completedOrders = orders.filter(order => order.status === 'COMPLETED')
+        const completedOrders = orders.filter(order => order.status === 'DONE')
         const totalSpent = completedOrders.reduce((sum, order) => sum + order.totalAmount, 0)
         
         // Determine member level based on total spent

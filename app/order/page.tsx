@@ -21,12 +21,10 @@ import {
 } from "@/components/ui/table"
 import { 
   IconRefresh, 
-  IconEdit, 
   IconEye,
   IconPhone,
-  IconCreditCard,
-  IconCash,
-  IconDeviceMobile
+  IconCheck,
+  IconTrash
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { 
@@ -63,13 +61,12 @@ interface OrderWithItems {
   userId: string
   status: string | null
   totalAmount: number
-  paymentStatus: string | null
-  paymentMethod: string | null
-  orderType: string | null
-  tableNumber: string | null
+  floor: string | null
   customerName: string | null
   customerPhone: string | null
   notes: string | null
+  estimatedCompletionTime: string | null
+  completedAt: string | null
   createdAt: string
   updatedAt: string
   orderItems?: Array<{
@@ -117,7 +114,7 @@ function OrdersDataTable({ orders, onRefresh }: {
     try {
       const { errors } = await client.models.Order.update({
         id: orderId,
-        status: newStatus as "PENDING" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED",
+        status: newStatus as "PENDING" | "DONE",
       })
 
       if (errors && errors.length > 0) {
@@ -162,20 +159,18 @@ function OrdersDataTable({ orders, onRefresh }: {
       },
     },
     {
-      accessorKey: "orderType",
-      header: "Type",
+      accessorKey: "floor",
+      header: "Floor",
       cell: ({ row }) => {
-        const orderType = row.getValue("orderType") as string
-        const tableNumber = row.original.tableNumber
+        const floor = row.getValue("floor") as string
         return (
           <div>
-            <Badge variant="outline">
-              {orderType?.replace('_', ' ') || 'DINE IN'}
-            </Badge>
-            {tableNumber && (
-              <div className="text-xs text-muted-foreground mt-1">
-                Table: {tableNumber}
-              </div>
+            {floor ? (
+              <Badge variant="outline">
+                Floor: {floor}
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground text-sm">No floor specified</span>
             )}
           </div>
         )
@@ -195,61 +190,23 @@ function OrdersDataTable({ orders, onRefresh }: {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="CONFIRMED">Confirmed</SelectItem>
-              <SelectItem value="PREPARING">Preparing</SelectItem>
-              <SelectItem value="READY">Ready</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-              <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              <SelectItem value="DONE">Done</SelectItem>
             </SelectContent>
           </Select>
         )
       },
     },
     {
-      accessorKey: "paymentStatus",
-      header: "Payment",
+      accessorKey: "notes",
+      header: "Notes",
       cell: ({ row }) => {
-        const paymentStatus = row.getValue("paymentStatus") as string
-        const paymentMethod = row.original.paymentMethod
-        
-        const getPaymentMethodIcon = (method: string) => {
-          switch (method) {
-            case 'CASH':
-              return <IconCash className="h-4 w-4" />
-            case 'CARD':
-              return <IconCreditCard className="h-4 w-4" />
-            case 'MOBILE_PAYMENT':
-              return <IconDeviceMobile className="h-4 w-4" />
-            default:
-              return <IconCreditCard className="h-4 w-4" />
-          }
-        }
-
-        const getPaymentStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-          switch (status) {
-            case 'PENDING':
-              return 'secondary'
-            case 'PAID':
-              return 'default'
-            case 'FAILED':
-              return 'destructive'
-            case 'REFUNDED':
-              return 'outline'
-            default:
-              return 'secondary'
-          }
-        }
-
+        const notes = row.getValue("notes") as string
         return (
-          <div className="space-y-1">
-            <Badge variant={getPaymentStatusBadgeVariant(paymentStatus)}>
-              {paymentStatus || 'PENDING'}
-            </Badge>
-            {paymentMethod && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                {getPaymentMethodIcon(paymentMethod)}
-                <span>{paymentMethod.replace('_', ' ')}</span>
-              </div>
+          <div className="max-w-32">
+            {notes ? (
+              <span className="text-sm text-muted-foreground">{notes}</span>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">No notes</span>
             )}
           </div>
         )
@@ -274,23 +231,43 @@ function OrdersDataTable({ orders, onRefresh }: {
     {
       id: "actions",
       header: "Actions",
-      cell: () => {
+      cell: ({ row }) => {
+        const order = row.original
+        
+        const handleMarkDone = async () => {
+          try {
+            const { errors } = await client.models.Order.update({
+              id: order.id,
+              status: "DONE",
+              completedAt: new Date().toISOString()
+            })
+
+            if (errors && errors.length > 0) {
+              console.error("Error marking order as done:", errors)
+              toast.error(`Failed to mark order as done: ${errors[0]?.message || 'Unknown error'}`)
+              return
+            }
+
+            toast.success("Order marked as done!")
+            onRefresh?.()
+          } catch (error) {
+            console.error("Exception during mark as done:", error)
+            toast.error("Failed to mark order as done. Please try again.")
+          }
+        }
+
+        
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
                 <IconEye className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <IconEye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconEdit className="mr-2 h-4 w-4" />
-                Edit Order
+              <DropdownMenuItem onClick={handleMarkDone} disabled={order.status === "DONE"}>
+                <IconCheck className="mr-2 h-4 w-4" />
+                Mark as Done
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -430,9 +407,9 @@ const Page = () => {
       
       console.log("Fetching orders...")
       
-      const { data: ordersData, errors } = await client.models.Order.list({
-        authMode: "userPool",
-      })
+      const { data: ordersData, errors } = await client.models.Order.list()
+
+      console.log("Raw response:", { ordersData, errors })
 
       if (errors && errors.length > 0) {
         console.error("Error fetching orders:", errors)
@@ -440,7 +417,10 @@ const Page = () => {
         return
       }
 
+      console.log("Orders data:", ordersData)
+
       if (ordersData) {
+        console.log(`Found ${ordersData.length} orders`)
         // Fetch order items for each order
         const ordersWithItems: OrderWithItems[] = await Promise.all(
           ordersData.map(async (order) => {
@@ -489,13 +469,12 @@ const Page = () => {
                 userId: order.userId,
                 status: order.status,
                 totalAmount: order.totalAmount,
-                paymentStatus: order.paymentStatus,
-                paymentMethod: order.paymentMethod,
-                orderType: order.orderType,
-                tableNumber: order.tableNumber,
+                floor: order.floor,
                 customerName: order.customerName,
                 customerPhone: order.customerPhone,
                 notes: order.notes,
+                estimatedCompletionTime: order.estimatedCompletionTime,
+                completedAt: order.completedAt,
                 createdAt: order.createdAt || new Date().toISOString(),
                 updatedAt: order.updatedAt || new Date().toISOString(),
                 orderItems: orderItemsWithMenuItems
@@ -508,13 +487,12 @@ const Page = () => {
                 userId: order.userId,
                 status: order.status,
                 totalAmount: order.totalAmount,
-                paymentStatus: order.paymentStatus,
-                paymentMethod: order.paymentMethod,
-                orderType: order.orderType,
-                tableNumber: order.tableNumber,
+                floor: order.floor,
                 customerName: order.customerName,
                 customerPhone: order.customerPhone,
                 notes: order.notes,
+                estimatedCompletionTime: order.estimatedCompletionTime,
+                completedAt: order.completedAt,
                 createdAt: order.createdAt || new Date().toISOString(),
                 updatedAt: order.updatedAt || new Date().toISOString(),
                 orderItems: []
@@ -603,11 +581,7 @@ const Page = () => {
                       <SelectContent>
                         <SelectItem value="ALL">All Orders</SelectItem>
                         <SelectItem value="PENDING">Pending</SelectItem>
-                        <SelectItem value="CONFIRMED">Confirmed</SelectItem>
-                        <SelectItem value="PREPARING">Preparing</SelectItem>
-                        <SelectItem value="READY">Ready</SelectItem>
-                        <SelectItem value="COMPLETED">Completed</SelectItem>
-                        <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                        <SelectItem value="DONE">Done</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

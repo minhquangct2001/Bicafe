@@ -31,13 +31,6 @@ import {
 } from "@/components/ui/form"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
     IconSearch,
     IconShoppingCart,
     IconPlus,
@@ -45,9 +38,7 @@ import {
     IconX,
     IconCoffee,
     IconCookie,
-    IconCreditCard,
-    IconCash,
-    IconPhone
+    IconCreditCard
 } from '@tabler/icons-react'
 import { toast } from "sonner"
 import Image from "next/image"
@@ -60,6 +51,7 @@ const client = generateClient<Schema>()
 
 type MenuItem = Schema["MenuItem"]["type"]
 type Category = Schema["Category"]["type"]
+type UserProfile = Schema["UserProfile"]["type"]
 
 interface CartItem {
   menuItem: MenuItem
@@ -68,9 +60,7 @@ interface CartItem {
 const checkoutSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
   customerPhone: z.string().min(1, "Phone number is required"),
-  orderType: z.enum(["DINE_IN", "TAKEAWAY", "DELIVERY"]),
-  paymentMethod: z.enum(["CASH", "CARD", "MOBILE_PAYMENT"]),
-  tableNumber: z.string().optional(),
+  floor: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -131,12 +121,37 @@ function CheckoutDialog({
     defaultValues: {
       customerName: "",
       customerPhone: "",
-      orderType: "DINE_IN",
-      paymentMethod: "CASH",
-      tableNumber: "",
+      floor: "",
       notes: "",
     },
   })
+
+  // Fetch user profile to auto-fill form
+  const fetchUserProfile = React.useCallback(async () => {
+    if (!user?.userId) return
+
+    try {
+      const { data: profiles } = await client.models.UserProfile.list({
+        filter: { userId: { eq: user.userId } }
+      })
+
+      if (profiles && profiles.length > 0) {
+        const profile = profiles[0]
+        
+        // Auto-fill form with user profile data
+        form.setValue("customerName", profile.name || "")
+        form.setValue("customerPhone", profile.phone || "")
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error)
+    }
+  }, [user?.userId, form])
+
+  React.useEffect(() => {
+    if (open && user?.userId) {
+      fetchUserProfile()
+    }
+  }, [open, user?.userId, fetchUserProfile])
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -176,10 +191,7 @@ function CheckoutDialog({
         userId: user.userId,
         status: "PENDING",
         totalAmount: totalPrice,
-        paymentStatus: "PENDING",
-        paymentMethod: data.paymentMethod,
-        orderType: data.orderType,
-        tableNumber: data.tableNumber || "",
+        floor: data.floor || "",
         customerName: data.customerName,
         customerPhone: data.customerPhone,
         notes: data.notes || "",
@@ -307,76 +319,14 @@ function CheckoutDialog({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="orderType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Order Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select order type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="DINE_IN">Dine In</SelectItem>
-                        <SelectItem value="TAKEAWAY">Takeaway</SelectItem>
-                        <SelectItem value="DELIVERY">Delivery</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="paymentMethod"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment method" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="CASH">
-                          <div className="flex items-center gap-2">
-                            <IconCash className="h-4 w-4" />
-                            Cash
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="CARD">
-                          <div className="flex items-center gap-2">
-                            <IconCreditCard className="h-4 w-4" />
-                            Card
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="MOBILE_PAYMENT">
-                          <div className="flex items-center gap-2">
-                            <IconPhone className="h-4 w-4" />
-                            Mobile Payment
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
             <FormField
               control={form.control}
-              name="tableNumber"
+              name="floor"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Table Number (Optional)</FormLabel>
+                  <FormLabel>Floor</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter table number" {...field} />
+                    <Input placeholder="Enter floor number" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -388,7 +338,7 @@ function CheckoutDialog({
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Special Instructions (Optional)</FormLabel>
+                  <FormLabel>Note</FormLabel>
                   <FormControl>
                     <Textarea 
                       placeholder="Any special requests or notes..."
