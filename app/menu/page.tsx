@@ -461,7 +461,7 @@ const Page = () => {
 
     if (loading) {
         return (
-            <ProtectedRoute requireAuth={true}>
+            <ProtectedRoute requireAuth={true} allowedRoles={['USER']}>
                 <SidebarProvider
                     style={
                         {
@@ -485,7 +485,7 @@ const Page = () => {
         )
     }
     return (
-        <ProtectedRoute requireAuth={true}>
+        <ProtectedRoute requireAuth={true} allowedRoles={['USER']}>
             <SidebarProvider
                 style={
                     {

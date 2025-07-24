@@ -24,7 +24,9 @@ import {
   IconEye,
   IconPhone,
   IconCheck,
-  IconTrash
+  IconTrash,
+  IconCircleCheckFilled,
+  IconLoader
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { 
@@ -110,27 +112,6 @@ function OrdersDataTable({ orders, onRefresh }: {
     })
   }
 
-  const handleUpdateStatus = React.useCallback(async (orderId: string, newStatus: string) => {
-    try {
-      const { errors } = await client.models.Order.update({
-        id: orderId,
-        status: newStatus as "PENDING" | "DONE",
-      })
-
-      if (errors && errors.length > 0) {
-        console.error("Error updating order status:", errors)
-        toast.error(`Failed to update order status: ${errors[0]?.message || 'Unknown error'}`)
-        return
-      }
-
-      toast.success(`Order status updated to ${newStatus}`)
-      onRefresh?.()
-    } catch (error) {
-      console.error("Exception during status update:", error)
-      toast.error("Failed to update order status. Please try again.")
-    }
-  }, [onRefresh])
-
   const columns: ColumnDef<OrderWithItems>[] = [
     {
       accessorKey: "orderNumber",
@@ -181,18 +162,16 @@ function OrdersDataTable({ orders, onRefresh }: {
       header: "Status",
       cell: ({ row }) => {
         const status = row.getValue("status") as string
-        const orderId = row.original.id
         
         return (
-          <Select value={status} onValueChange={(newStatus) => handleUpdateStatus(orderId, newStatus)}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="DONE">Done</SelectItem>
-            </SelectContent>
-          </Select>
+          <Badge variant="outline" className="text-muted-foreground px-1.5">
+            {status === "DONE" ? (
+              <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400 mr-1" />
+            ) : (
+              <IconLoader className="mr-1" />
+            )}
+            {status}
+          </Badge>
         )
       },
     },
@@ -256,6 +235,28 @@ function OrdersDataTable({ orders, onRefresh }: {
           }
         }
 
+        const handleMarkPending = async () => {
+          try {
+            const { errors } = await client.models.Order.update({
+              id: order.id,
+              status: "PENDING",
+              completedAt: null
+            })
+
+            if (errors && errors.length > 0) {
+              console.error("Error marking order as pending:", errors)
+              toast.error(`Failed to mark order as pending: ${errors[0]?.message || 'Unknown error'}`)
+              return
+            }
+
+            toast.success("Order marked as pending!")
+            onRefresh?.()
+          } catch (error) {
+            console.error("Exception during mark as pending:", error)
+            toast.error("Failed to mark order as pending. Please try again.")
+          }
+        }
+
         
         return (
           <DropdownMenu>
@@ -268,6 +269,10 @@ function OrdersDataTable({ orders, onRefresh }: {
               <DropdownMenuItem onClick={handleMarkDone} disabled={order.status === "DONE"}>
                 <IconCheck className="mr-2 h-4 w-4" />
                 Mark as Done
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleMarkPending} disabled={order.status === "PENDING"}>
+                <IconLoader className="mr-2 h-4 w-4" />
+                Mark as Pending
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

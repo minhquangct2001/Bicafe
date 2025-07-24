@@ -40,7 +40,9 @@ import {
   IconHistory,
   IconPhone,
   IconRefresh,
-  IconShoppingBag
+  IconShoppingBag,
+  IconCircleCheckFilled,
+  IconLoader
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -310,25 +312,6 @@ function OrderHistoryDataTable({ orders }: {
     })
   }
 
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case 'PENDING':
-        return 'secondary'
-      case 'CONFIRMED':
-        return 'default'
-      case 'PREPARING':
-        return 'outline'
-      case 'READY':
-        return 'default'
-      case 'COMPLETED':
-        return 'default'
-      case 'CANCELLED':
-        return 'destructive'
-      default:
-        return 'secondary'
-    }
-  }
-
   const columns: ColumnDef<OrderWithItems>[] = [
     {
       accessorKey: "orderNumber",
@@ -361,7 +344,12 @@ function OrderHistoryDataTable({ orders }: {
       cell: ({ row }) => {
         const status = row.getValue("status") as string
         return (
-          <Badge variant={getStatusBadgeVariant(status)}>
+          <Badge variant="outline" className="text-muted-foreground px-1.5">
+            {status === "DONE" ? (
+              <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400 mr-1" />
+            ) : (
+              <IconLoader className="mr-1" />
+            )}
             {status || 'PENDING'}
           </Badge>
         )
@@ -717,7 +705,7 @@ const Page = () => {
   }
 
   return (
-    <ProtectedRoute requireAuth={true}>
+    <ProtectedRoute requireAuth={true} allowedRoles={['USER']}>
       <SidebarProvider
         style={
           {

@@ -875,7 +875,7 @@ const ProductPage = () => {
   }, [fetchData])
 
   return (
-    <ProtectedRoute requireAuth={true}>
+    <ProtectedRoute requireAuth={true} allowedRoles={['ADMIN']}>
       <SidebarProvider
         style={
           {

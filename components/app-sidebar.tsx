@@ -35,52 +35,71 @@ import {
 } from "@/components/ui/sidebar"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user } = useAuthStore();
+  const { user, userRole } = useAuthStore();
   
   const userData = {
     email: user?.signInDetails?.loginId || "user@bicafe.com",
     avatar: "/avatars/user.jpg", 
   };
 
+  // Define navigation items based on user role
+  const getNavMainByRole = () => {
+    if (userRole === 'ADMIN') {
+      return [
+        {
+          title: "Dashboard",
+          url: "/dashboard",
+          icon: IconDashboard,
+        },
+        {
+          title: "Product Management",
+          url: "/product",
+          icon: IconListDetails,
+        },
+        {
+          title: "Categories Management",
+          url: "/category",
+          icon: IconFolder,
+        },
+        {
+          title: "Order Management",
+          url: "/order",
+          icon: IconUsers,
+        },
+        {
+          title: "Revenue",
+          url: "/revenue",
+          icon: IconChartBar,
+        },
+      ];
+    } else if (userRole === 'USER') {
+      return [
+        {
+          title: "Menu",
+          url: "/menu",
+          icon: IconChartBar,
+        },
+        {
+          title: "My Orders",
+          url: "/orderHistory",
+          icon: IconUsers,
+        },
+      ];
+    } else {
+      // Default fallback if role is not determined yet
+      return [
+        {
+          title: "Dashboard",
+          url: "/dashboard",
+          icon: IconDashboard,
+        },
+      ];
+    }
+  };
+
   const data = {
     user: userData,
-    navMain: [
-      {
-        title: "Dashboard",
-        url: "/dashboard",
-        icon: IconDashboard,
-      },
-      {
-        title: "Product Management",
-        url: "/product",
-        icon: IconListDetails,
-      },
-      {
-        title: "Menu",
-        url: "/menu",
-        icon: IconChartBar,
-      },
-      {
-        title: "Categories Management",
-        url: "/category",
-        icon: IconFolder,
-      },
-      {
-        title: "Order Management",
-        url: "/order",
-        icon: IconUsers,
-      },
-      {
-        title: "My Orders",
-        url: "/orderHistory",
-        icon: IconUsers,
-      },
-       {
-        title: "Revenue",
-        url: "/revenue",
-        icon: IconUsers,
-      },
-    ],
+    navMain: getNavMainByRole(),
     navClouds: [
       {
         title: "Capture",

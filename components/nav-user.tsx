@@ -41,11 +41,17 @@ export function NavUser({
   }
 }) {
   const router = useRouter()
-  const { signOut } = useAuthStore()
+  const { signOut, userRole } = useAuthStore()
   const { isMobile } = useSidebar()
   const handleLogout = async () => {
     await signOut();
     router.push('/login');
+  }
+
+  const getRoleDisplayName = (role: string | null) => {
+    if (role === 'ADMIN') return 'Administrator'
+    if (role === 'USER') return 'Customer'
+    return 'Loading...'
   }
 
   return (
@@ -63,7 +69,9 @@ export function NavUser({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.email}</span>
-
+                <span className="truncate text-xs text-muted-foreground">
+                  {getRoleDisplayName(userRole)}
+                </span>
               </div>
               <IconDotsVertical className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -82,6 +90,9 @@ export function NavUser({
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.email}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {getRoleDisplayName(userRole)}
+                  </span>
                 </div>
               </div>
             </DropdownMenuLabel>
