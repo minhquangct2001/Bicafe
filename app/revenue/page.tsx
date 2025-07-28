@@ -1,17 +1,25 @@
 "use client"
 
 import * as React from "react"
-import { generateClient } from "aws-amplify/data"
-import { getCurrentUser } from "aws-amplify/auth"
-import { type Schema } from "@/amplify/data/resource"
+import { generateClient } from 'aws-amplify/api'
+import { type Schema } from '@/amplify/data/resource'
+import { RevenueChart } from '@/components/revenue-chart'
 import { AppSidebar } from '@/components/app-sidebar'
 import { ProtectedRoute } from '@/components/protected-route'
 import { SiteHeader } from '@/components/site-header'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RevenueChart } from "@/components/revenue-chart"
-import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { 
+  IconTrendingUp, 
+  IconTrendingDown, 
+  IconCurrencyDollar, 
+
+  IconShoppingCart, 
+  IconChartBar,
+  IconClock
+} from '@tabler/icons-react'
 
 const client = generateClient<Schema>()
 
@@ -22,341 +30,241 @@ interface RevenueData {
   averageOrderValue: number
 }
 
-interface SummaryStats {
-  totalRevenue: number
-  totalOrders: number
-  averageOrderValue: number
-  growthRate: number
-}
+const SELECTION_SET = [
+  'id',
+  'status',
+  'createdAt',
+  'totalAmount'
+]
 
-const Page = () => {
-  const [loading, setLoading] = React.useState(true)
+const RevenuePage = () => {
   const [revenueData, setRevenueData] = React.useState<RevenueData[]>([])
-  const [summaryStats, setSummaryStats] = React.useState<SummaryStats>({
-    totalRevenue: 0,
-    totalOrders: 0,
-    averageOrderValue: 0,
-    growthRate: 0
-  })
-  const [user, setUser] = React.useState<{ userId: string } | null>(null)
+  const [loading, setLoading] = React.useState(true)
 
-  // Check authentication
-  React.useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const currentUser = await getCurrentUser()
-        setUser(currentUser)
-      } catch (error) {
-        console.log("No authenticated user", error)
-        setUser(null)
-      }
-    }
-    checkAuth()
-  }, [])
-
-  const formatPrice = (price: number) => {
+  const formatPrice = (value: number) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
-    }).format(price)
+    }).format(value)
   }
 
   const fetchRevenueData = React.useCallback(async () => {
     try {
       setLoading(true)
+      
+      // Fetch orders from last 90 days
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - 90)
+      
+      const response = await client.models.Order.list({
+        selectionSet: SELECTION_SET,
+        filter: {
+          and: [
+            { status: { eq: 'DONE' } },
+            { createdAt: { ge: startDate.toISOString() } }
+          ]
+        }
+      })
 
-      console.log("Fetching daily sales...")
-      const { data: dailySales, errors } = await client.models.DailySales.list()
+      if (response.data) {
+        const revenueByDate = new Map<string, { revenue: number, orders: number }>()
+        
+        response.data.forEach(order => {
+          const date = new Date(order.createdAt || '').toISOString().split('T')[0] // YYYY-MM-DD format
+          const current = revenueByDate.get(date) || { revenue: 0, orders: 0 }
+          
+          revenueByDate.set(date, {
+            revenue: current.revenue + order.totalAmount,
+            orders: current.orders + 1
+          })
+        })
 
-      if (errors && errors.length > 0) {
-        console.error("Error fetching daily sales:", errors)
-        toast.error(`Failed to fetch revenue data: ${errors[0]?.message || 'Unknown error'}`)
-        return
-      }
-
-      console.log("Daily sales data:", dailySales)
-
-      if (dailySales && dailySales.length > 0) {
-        // Transform data for chart
-        const chartData: RevenueData[] = dailySales
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .map(sale => ({
-            date: sale.date,
-            revenue: sale.totalRevenue,
-            orderCount: sale.orderCount,
-            averageOrderValue: sale.averageOrderValue
-          }))
+        const chartData: RevenueData[] = []
+        for (let i = 29; i >= 0; i--) {
+          const date = new Date()
+          date.setDate(date.getDate() - i)
+          const dateStr = date.toISOString().split('T')[0]
+          const dayData = revenueByDate.get(dateStr) || { revenue: 0, orders: 0 }
+          
+          chartData.push({
+            date: date.toISOString(),
+            revenue: dayData.revenue,
+            orderCount: dayData.orders,
+            averageOrderValue: dayData.orders > 0 ? dayData.revenue / dayData.orders : 0
+          })
+        }
 
         setRevenueData(chartData)
-
-        // Calculate summary stats
-        const totalRevenue = dailySales.reduce((sum, sale) => sum + sale.totalRevenue, 0)
-        const totalOrders = dailySales.reduce((sum, sale) => sum + sale.orderCount, 0)
-        const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-
-        // Calculate growth rate (comparing last 7 days with previous 7 days)
-        const sortedSales = [...dailySales].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        const last7Days = sortedSales.slice(0, 7).reduce((sum, sale) => sum + sale.totalRevenue, 0)
-        const previous7Days = sortedSales.slice(7, 14).reduce((sum, sale) => sum + sale.totalRevenue, 0)
-        const growthRate = previous7Days > 0 ? ((last7Days - previous7Days) / previous7Days) * 100 : 0
-
-        setSummaryStats({
-          totalRevenue,
-          totalOrders,
-          averageOrderValue,
-          growthRate
-        })
-      } else {
-        console.log("No daily sales data found")
-        setRevenueData([])
-        setSummaryStats({
-          totalRevenue: 0,
-          totalOrders: 0,
-          averageOrderValue: 0,
-          growthRate: 0
-        })
       }
     } catch (error) {
-      console.error("Exception during fetch:", error)
-      toast.error("Failed to fetch revenue data. Please try again.")
+      console.error('Error fetching revenue data:', error)
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const generateSampleData = React.useCallback(async () => {
-    try {
-      const today = new Date()
-      const promises = []
-      
-      // Generate 30 days of sample data
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        
-        const revenue = Math.random() * 2000000 + 500000 // 500k to 2.5M VND
-        const orders = Math.floor(Math.random() * 50) + 10 // 10-60 orders
-        const averageOrderValue = revenue / orders
-        
-        promises.push(
-          client.models.DailySales.create({
-            date: date.toISOString().split('T')[0],
-            totalRevenue: revenue,
-            orderCount: orders,
-            averageOrderValue: averageOrderValue,
-          })
-        )
-      }
-      
-      await Promise.all(promises)
-      toast.success("Sample data generated successfully!")
-      await fetchRevenueData()
-    } catch (error) {
-      console.error("Error generating sample data:", error)
-      toast.error("Failed to generate sample data")
-    }
-  }, [fetchRevenueData])
-
-  const calculateRevenueFromOrders = React.useCallback(async () => {
-    try {
-      // Fetch all completed orders
-      const { data: orders, errors } = await client.models.Order.list({
-        filter: { status: { eq: "DONE" } }
-      })
-
-      if (errors && errors.length > 0) {
-        console.error("Error fetching orders:", errors)
-        return
-      }
-
-      if (!orders || orders.length === 0) {
-        console.log("No completed orders found")
-        toast.info("No completed orders found to calculate revenue from")
-        return
-      }
-
-      // Group orders by date
-      const dailyData: { [key: string]: { revenue: number; orders: number } } = {}
-      
-      orders.forEach(order => {
-        const date = order.createdAt ? order.createdAt.split('T')[0] : new Date().toISOString().split('T')[0] // Get date part only
-        
-        if (!dailyData[date]) {
-          dailyData[date] = { revenue: 0, orders: 0 }
-        }
-        
-        dailyData[date].revenue += order.totalAmount
-        dailyData[date].orders += 1
-      })
-
-      // Create or update DailySales records
-      const promises = Object.entries(dailyData).map(async ([date, data]) => {
-        const averageOrderValue = data.revenue / data.orders
-        
-        // Check if record already exists
-        const { data: existingSales } = await client.models.DailySales.list({
-          filter: { date: { eq: date } }
-        })
-
-        if (existingSales && existingSales.length > 0) {
-          // Update existing record
-          return client.models.DailySales.update({
-            id: existingSales[0].id,
-            totalRevenue: data.revenue,
-            orderCount: data.orders,
-            averageOrderValue: averageOrderValue,
-          })
-        } else {
-          // Create new record
-          return client.models.DailySales.create({
-            date: date,
-            totalRevenue: data.revenue,
-            orderCount: data.orders,
-            averageOrderValue: averageOrderValue,
-          })
-        }
-      })
-
-      await Promise.all(promises)
-      toast.success("Revenue data calculated from orders!")
-      await fetchRevenueData()
-    } catch (error) {
-      console.error("Error calculating revenue from orders:", error)
-      toast.error("Failed to calculate revenue from orders")
-    }
-  }, [fetchRevenueData])
-
+  // Setup real-time subscription
   React.useEffect(() => {
-    if (user) {
-      fetchRevenueData()
-    }
-  }, [user, fetchRevenueData])
+    let subscription: { unsubscribe: () => void } | null = null
 
-  if (loading) {
-    return (
-      <ProtectedRoute>
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <SiteHeader />
-            <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-              <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min p-4">
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-muted-foreground">Loading revenue data...</div>
-                </div>
-              </div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </ProtectedRoute>
-    )
-  }
+    const setupSubscription = async () => {
+      try {
+        subscription = client.models.Order.observeQuery({
+          selectionSet: SELECTION_SET
+        }).subscribe({
+          next: () => {
+            fetchRevenueData()
+          },
+          error: (error) => {
+            console.error('Subscription error:', error)
+          }
+        })
+      } catch (error) {
+        console.error('Error setting up subscription:', error)
+      }
+    }
+
+    fetchRevenueData()
+    setupSubscription()
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
+  }, [fetchRevenueData])
+
+  // Calculate summary statistics
+  const summaryStats = React.useMemo(() => {
+    if (revenueData.length === 0) return null
+
+    const totalRevenue = revenueData.reduce((sum, day) => sum + day.revenue, 0)
+    const totalOrders = revenueData.reduce((sum, day) => sum + day.orderCount, 0)
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+
+    // Calculate growth compared to previous period
+    const half = Math.floor(revenueData.length / 2)
+    const firstHalf = revenueData.slice(0, half)
+    const secondHalf = revenueData.slice(half)
+    
+    const firstHalfRevenue = firstHalf.reduce((sum, day) => sum + day.revenue, 0)
+    const secondHalfRevenue = secondHalf.reduce((sum, day) => sum + day.revenue, 0)
+    
+    const growthRate = firstHalfRevenue > 0 
+      ? ((secondHalfRevenue - firstHalfRevenue) / firstHalfRevenue) * 100 
+      : 0
+
+    // Find peak hour (simplified - would need hour-by-hour data for accuracy)
+    const peakDay = revenueData.reduce((max, day) => 
+      day.revenue > max.revenue ? day : max, revenueData[0])
+
+    return {
+      totalRevenue,
+      totalOrders,
+      avgOrderValue,
+      growthRate,
+      peakDay: new Date(peakDay.date).toLocaleDateString('vi-VN', { 
+        weekday: 'long' 
+      })
+    }
+  }, [revenueData])
 
   return (
-    <ProtectedRoute>
-      <SidebarProvider>
-        <AppSidebar />
+    <ProtectedRoute requireAuth={true} allowedRoles={['ADMIN']}>
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 72)",
+            "--header-height": "calc(var(--spacing) * 12)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
         <SidebarInset>
           <SiteHeader />
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min p-4">
-              <div className="space-y-6">
-                {/* Header */}
+          <div className="flex flex-1 flex-col">
+            <div className="@container/main flex flex-1 flex-col gap-2">
+              <div className="flex flex-col gap-6 p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-3xl font-bold">Revenue Analytics</h1>
                     <p className="text-muted-foreground">
-                      Track your cafe&apos;s financial performance
+                      Track daily revenue and order statistics with real-time updates
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={calculateRevenueFromOrders}
-                      disabled={loading}
-                    >
-                      Calculate from Orders
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={generateSampleData}
-                      disabled={loading}
-                    >
-                      Generate Sample Data
-                    </Button>
-                    <Button onClick={fetchRevenueData} disabled={loading}>
-                      Refresh
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Summary Cards */}
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Total Revenue
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {formatPrice(summaryStats.totalRevenue)}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        All time revenue
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Total Orders
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {summaryStats.totalOrders.toLocaleString()}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Completed orders
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Average Order Value
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {formatPrice(summaryStats.averageOrderValue)}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Per order average
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Growth Rate
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {summaryStats.growthRate > 0 ? '+' : ''}
-                        {summaryStats.growthRate.toFixed(1)}%
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Last 7 days vs previous
-                      </p>
-                    </CardContent>
-                  </Card>
                 </div>
 
                 {/* Revenue Chart */}
-                <RevenueChart data={revenueData} />
+                {loading ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Revenue Analytics</CardTitle>
+                      <CardDescription>Loading revenue data...</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-[250px] w-full" />
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <RevenueChart data={revenueData} />
+                )}
+
+                {/* Summary Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                          {loading ? (
+                            <Skeleton className="h-8 w-20" />
+                          ) : (
+                            <p className="text-2xl font-bold text-green-600">
+                              {summaryStats ? formatPrice(summaryStats.totalRevenue) : formatPrice(0)}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Badge variant="secondary" className="text-xs">
+                              <IconCurrencyDollar className="h-3 w-3 mr-1" />
+                              Last 30 days
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="h-10 w-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                          <IconCurrencyDollar className="h-5 w-5 text-green-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
+                          {loading ? (
+                            <Skeleton className="h-8 w-20" />
+                          ) : (
+                            <p className="text-2xl font-bold text-blue-600">
+                              {summaryStats?.totalOrders.toLocaleString() || '0'}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Badge variant="secondary" className="text-xs">
+                              <IconShoppingCart className="h-3 w-3 mr-1" />
+                              Completed
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="h-10 w-10 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                          <IconShoppingCart className="h-5 w-5 text-blue-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+
+                </div>
               </div>
             </div>
           </div>
@@ -366,4 +274,4 @@ const Page = () => {
   )
 }
 
-export default Page
+export default RevenuePage

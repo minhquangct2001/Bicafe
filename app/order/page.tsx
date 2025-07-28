@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import Loading from '../product/loading'
+import { useOrderSubscriptions } from "@/hooks/use-order-subscriptions"
 import {
   Table,
   TableBody,
@@ -19,17 +20,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { 
-  IconRefresh, 
+import {
+  IconRefresh,
   IconEye,
   IconPhone,
   IconCheck,
-  IconTrash,
   IconCircleCheckFilled,
   IconLoader
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-import { 
+import {
   ColumnDef,
   flexRender,
   getCoreRowModel,
@@ -86,7 +86,7 @@ interface OrderWithItems {
   }>
 }
 
-function OrdersDataTable({ orders, onRefresh }: { 
+function OrdersDataTable({ orders, onRefresh }: {
   orders: OrderWithItems[]
   onRefresh?: () => void
 }) {
@@ -94,6 +94,7 @@ function OrdersDataTable({ orders, onRefresh }: {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+  const [globalFilter, setGlobalFilter] = React.useState("")
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -162,7 +163,7 @@ function OrdersDataTable({ orders, onRefresh }: {
       header: "Status",
       cell: ({ row }) => {
         const status = row.getValue("status") as string
-        
+
         return (
           <Badge variant="outline" className="text-muted-foreground px-1.5">
             {status === "DONE" ? (
@@ -172,6 +173,51 @@ function OrdersDataTable({ orders, onRefresh }: {
             )}
             {status}
           </Badge>
+        )
+      },
+    },
+    {
+      id: "items",
+      header: "Items",
+      accessorFn: (row) => {
+        // Create searchable string from order items
+        const itemNames = row.orderItems?.map(item =>
+          `${item.menuItem?.name} ${item.customizations || ''}`.trim()
+        ).join(' ') || ''
+        return itemNames
+      },
+      cell: ({ row }) => {
+        const order = row.original
+        const orderItems = order.orderItems || []
+
+        if (orderItems.length === 0) {
+          return (
+            <div className="text-sm text-muted-foreground italic">
+              No items
+            </div>
+          )
+        }
+
+        return (
+          <div className="max-w-48">
+            {orderItems.slice(0, 3).map((item) => (
+              <div key={item.id} className="text-sm">
+                <span className="font-medium">
+                  {item.quantity}x {item.menuItem?.name || 'Unknown item'}
+                </span>
+                {item.customizations && (
+                  <div className="text-xs text-muted-foreground ml-2">
+                    + {item.customizations}
+                  </div>
+                )}
+              </div>
+            ))}
+            {orderItems.length > 3 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                +{orderItems.length - 3} more items
+              </div>
+            )}
+          </div>
         )
       },
     },
@@ -212,7 +258,7 @@ function OrdersDataTable({ orders, onRefresh }: {
       header: "Actions",
       cell: ({ row }) => {
         const order = row.original
-        
+
         const handleMarkDone = async () => {
           try {
             const { errors } = await client.models.Order.update({
@@ -226,8 +272,6 @@ function OrdersDataTable({ orders, onRefresh }: {
               toast.error(`Failed to mark order as done: ${errors[0]?.message || 'Unknown error'}`)
               return
             }
-
-            toast.success("Order marked as done!")
             onRefresh?.()
           } catch (error) {
             console.error("Exception during mark as done:", error)
@@ -248,8 +292,6 @@ function OrdersDataTable({ orders, onRefresh }: {
               toast.error(`Failed to mark order as pending: ${errors[0]?.message || 'Unknown error'}`)
               return
             }
-
-            toast.success("Order marked as pending!")
             onRefresh?.()
           } catch (error) {
             console.error("Exception during mark as pending:", error)
@@ -257,7 +299,7 @@ function OrdersDataTable({ orders, onRefresh }: {
           }
         }
 
-        
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -286,6 +328,7 @@ function OrdersDataTable({ orders, onRefresh }: {
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -297,6 +340,7 @@ function OrdersDataTable({ orders, onRefresh }: {
       columnFilters,
       columnVisibility,
       rowSelection,
+      globalFilter,
     },
   })
 
@@ -305,11 +349,9 @@ function OrdersDataTable({ orders, onRefresh }: {
       {/* Search and filters */}
       <div className="flex items-center gap-4">
         <Input
-          placeholder="Search orders..."
-          value={(table.getColumn("orderNumber")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("orderNumber")?.setFilterValue(event.target.value)
-          }
+          placeholder="Search orders or items..."
+          value={globalFilter ?? ""}
+          onChange={(event) => setGlobalFilter(String(event.target.value))}
           className="max-w-sm"
         />
       </div>
@@ -326,9 +368,9 @@ function OrdersDataTable({ orders, onRefresh }: {
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                     </TableHead>
                   )
                 })}
@@ -401,7 +443,7 @@ const Page = () => {
   const [isRefreshing, setIsRefreshing] = React.useState(false)
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL")
 
-  // Fetch orders data
+  // Optimized fetch orders data with a single GraphQL query
   const fetchData = React.useCallback(async (refresh = false) => {
     try {
       if (refresh) {
@@ -409,12 +451,38 @@ const Page = () => {
       } else {
         setLoading(true)
       }
-      
-      console.log("Fetching orders...")
-      
-      const { data: ordersData, errors } = await client.models.Order.list()
 
-      console.log("Raw response:", { ordersData, errors })
+      console.log("🚀 Fetching orders with OPTIMIZED single GraphQL query...")
+
+      // Use selectionSet to fetch all related data in a single query
+      const { data: ordersData, errors } = await client.models.Order.list({
+        selectionSet: [
+          'id',
+          'orderNumber',
+          'userId',
+          'status',
+          'totalAmount',
+          'floor',
+          'customerName',
+          'customerPhone',
+          'notes',
+          'estimatedCompletionTime',
+          'completedAt',
+          'createdAt',
+          'updatedAt',
+          'orderItems.id',
+          'orderItems.quantity',
+          'orderItems.unitPrice',
+          'orderItems.totalPrice',
+          'orderItems.customizations',
+          'orderItems.menuItem.id',
+          'orderItems.menuItem.name',
+          'orderItems.menuItem.description',
+          'orderItems.menuItem.price',
+        ]
+      })
+
+      console.log("✅ Single API call response:", { ordersData, errors })
 
       if (errors && errors.length > 0) {
         console.error("Error fetching orders:", errors)
@@ -422,100 +490,51 @@ const Page = () => {
         return
       }
 
-      console.log("Orders data:", ordersData)
-
       if (ordersData) {
-        console.log(`Found ${ordersData.length} orders`)
-        // Fetch order items for each order
-        const ordersWithItems: OrderWithItems[] = await Promise.all(
-          ordersData.map(async (order) => {
-            try {
-              const { data: orderItems } = await client.models.OrderItem.list({
-                filter: { orderId: { eq: order.id } },
-              })
+        console.log(`📊 Found ${ordersData.length} orders with ALL related data in 1 API call!`)
 
-              // Fetch menu items for each order item
-              const orderItemsWithMenuItems = await Promise.all(
-                (orderItems || []).map(async (orderItem) => {
-                  try {
-                    const { data: menuItem } = await client.models.MenuItem.get({
-                      id: orderItem.menuItemId,
-                    })
-                    return {
-                      id: orderItem.id,
-                      quantity: orderItem.quantity,
-                      unitPrice: orderItem.unitPrice,
-                      totalPrice: orderItem.totalPrice,
-                      customizations: orderItem.customizations,
-                      menuItem: menuItem ? {
-                        id: menuItem.id,
-                        name: menuItem.name,
-                        description: menuItem.description,
-                        price: menuItem.price,
-                      } : null
-                    }
-                  } catch (error) {
-                    console.error("Error fetching menu item:", error)
-                    return {
-                      id: orderItem.id,
-                      quantity: orderItem.quantity,
-                      unitPrice: orderItem.unitPrice,
-                      totalPrice: orderItem.totalPrice,
-                      customizations: orderItem.customizations,
-                      menuItem: null
-                    }
-                  }
-                })
-              )
-
-              return {
-                id: order.id,
-                orderNumber: order.orderNumber,
-                userId: order.userId,
-                status: order.status,
-                totalAmount: order.totalAmount,
-                floor: order.floor,
-                customerName: order.customerName,
-                customerPhone: order.customerPhone,
-                notes: order.notes,
-                estimatedCompletionTime: order.estimatedCompletionTime,
-                completedAt: order.completedAt,
-                createdAt: order.createdAt || new Date().toISOString(),
-                updatedAt: order.updatedAt || new Date().toISOString(),
-                orderItems: orderItemsWithMenuItems
-              } as OrderWithItems
-            } catch (error) {
-              console.error("Error fetching order items for order:", order.id, error)
-              return {
-                id: order.id,
-                orderNumber: order.orderNumber,
-                userId: order.userId,
-                status: order.status,
-                totalAmount: order.totalAmount,
-                floor: order.floor,
-                customerName: order.customerName,
-                customerPhone: order.customerPhone,
-                notes: order.notes,
-                estimatedCompletionTime: order.estimatedCompletionTime,
-                completedAt: order.completedAt,
-                createdAt: order.createdAt || new Date().toISOString(),
-                updatedAt: order.updatedAt || new Date().toISOString(),
-                orderItems: []
-              } as OrderWithItems
-            }
-          })
-        )
+        // Transform the response to match our interface
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ordersWithItems: OrderWithItems[] = ordersData.map((order: any) => ({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          userId: order.userId,
+          status: order.status || null,
+          totalAmount: order.totalAmount,
+          floor: order.floor || null,
+          customerName: order.customerName || null,
+          customerPhone: order.customerPhone || null,
+          notes: order.notes || null,
+          estimatedCompletionTime: order.estimatedCompletionTime || null,
+          completedAt: order.completedAt || null,
+          createdAt: order.createdAt || new Date().toISOString(),
+          updatedAt: order.updatedAt || new Date().toISOString(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          orderItems: (order.orderItems || []).map((orderItem: any) => ({
+            id: orderItem.id,
+            quantity: orderItem.quantity,
+            unitPrice: orderItem.unitPrice,
+            totalPrice: orderItem.totalPrice,
+            customizations: orderItem.customizations || null,
+            menuItem: orderItem.menuItem ? {
+              id: orderItem.menuItem.id,
+              name: orderItem.menuItem.name,
+              description: orderItem.menuItem.description || null,
+              price: orderItem.menuItem.price,
+            } : null
+          }))
+        }))
 
         // Sort by creation date (newest first)
-        ordersWithItems.sort((a, b) => 
+        ordersWithItems.sort((a, b) =>
           new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
         )
 
         setOrders(ordersWithItems)
-        console.log(`Fetched ${ordersWithItems.length} orders`)
+        console.log(`🎯 SUCCESS: Loaded ${ordersWithItems.length} orders with 1 API call (vs previous 10+ calls)`)
       }
     } catch (error) {
-      console.error("Exception during data fetch:", error)
+      console.error("Exception during optimized data fetch:", error)
       toast.error("Failed to fetch orders. Please try again.")
     } finally {
       setLoading(false)
@@ -527,6 +546,207 @@ const Page = () => {
   const handleRefresh = React.useCallback(() => {
     fetchData(true)
   }, [fetchData])
+
+  // Real-time subscription handlers - Optimized to avoid unnecessary API calls
+  const handleOrderCreated = React.useCallback(async (newOrder: Schema["Order"]["type"]) => {
+    console.log("Real-time: New order created", newOrder)
+
+    try {
+      // Fetch the complete order data with items
+      console.log("🔄 Fetching complete order data for new order:", newOrder.id)
+
+      const { data: ordersData, errors } = await client.models.Order.list({
+        filter: { id: { eq: newOrder.id } },
+        selectionSet: [
+          'id',
+          'orderNumber',
+          'userId',
+          'status',
+          'totalAmount',
+          'floor',
+          'customerName',
+          'customerPhone',
+          'notes',
+          'estimatedCompletionTime',
+          'completedAt',
+          'createdAt',
+          'updatedAt',
+          'orderItems.id',
+          'orderItems.quantity',
+          'orderItems.unitPrice',
+          'orderItems.totalPrice',
+          'orderItems.customizations',
+          'orderItems.menuItem.id',
+          'orderItems.menuItem.name',
+          'orderItems.menuItem.description',
+          'orderItems.menuItem.price',
+        ]
+      })
+
+      if (errors && errors.length > 0) {
+        console.error("Error fetching complete order data:", errors)
+        // Fallback to minimal order if fetch fails
+        setOrders(prevOrders => {
+          const exists = prevOrders.some(order => order.id === newOrder.id)
+          if (exists) return prevOrders
+
+          const minimalOrder: OrderWithItems = {
+            id: newOrder.id,
+            orderNumber: newOrder.orderNumber,
+            userId: newOrder.userId,
+            status: newOrder.status || null,
+            totalAmount: newOrder.totalAmount,
+            floor: newOrder.floor || null,
+            customerName: newOrder.customerName || null,
+            customerPhone: newOrder.customerPhone || null,
+            notes: newOrder.notes || null,
+            estimatedCompletionTime: newOrder.estimatedCompletionTime || null,
+            completedAt: newOrder.completedAt || null,
+            createdAt: newOrder.createdAt || new Date().toISOString(),
+            updatedAt: newOrder.updatedAt || new Date().toISOString(),
+            orderItems: []
+          }
+
+          return [minimalOrder, ...prevOrders]
+        })
+        return
+      }
+
+      if (ordersData && ordersData.length > 0) {
+        const completeOrderData = ordersData[0]
+        console.log("✅ Complete order data fetched:", completeOrderData)
+
+        // Transform the complete order data
+        const completeOrder: OrderWithItems = {
+          id: completeOrderData.id,
+          orderNumber: completeOrderData.orderNumber,
+          userId: completeOrderData.userId,
+          status: completeOrderData.status || null,
+          totalAmount: completeOrderData.totalAmount,
+          floor: completeOrderData.floor || null,
+          customerName: completeOrderData.customerName || null,
+          customerPhone: completeOrderData.customerPhone || null,
+          notes: completeOrderData.notes || null,
+          estimatedCompletionTime: completeOrderData.estimatedCompletionTime || null,
+          completedAt: completeOrderData.completedAt || null,
+          createdAt: completeOrderData.createdAt || new Date().toISOString(),
+          updatedAt: completeOrderData.updatedAt || new Date().toISOString(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          orderItems: (completeOrderData.orderItems || []).map((orderItem: any) => ({
+            id: orderItem.id,
+            quantity: orderItem.quantity,
+            unitPrice: orderItem.unitPrice,
+            totalPrice: orderItem.totalPrice,
+            customizations: orderItem.customizations || null,
+            menuItem: orderItem.menuItem ? {
+              id: orderItem.menuItem.id,
+              name: orderItem.menuItem.name,
+              description: orderItem.menuItem.description || null,
+              price: orderItem.menuItem.price,
+            } : null
+          }))
+        }
+
+        // Update the orders list with complete data
+        setOrders(prevOrders => {
+          // Check if order already exists to avoid duplicates
+          const exists = prevOrders.some(order => order.id === completeOrder.id)
+          if (exists) {
+            // Update existing order with complete data
+            return prevOrders.map(order =>
+              order.id === completeOrder.id ? completeOrder : order
+            )
+          }
+
+          // Add new complete order to the beginning of the list (newest first)
+          return [completeOrder, ...prevOrders]
+        })
+
+        // Show enhanced toast with item names
+        const itemNames = completeOrder.orderItems?.map(item =>
+          `${item.quantity}x ${item.menuItem?.name || 'Unknown'}`
+        ).join(', ') || 'No items'
+
+        toast.success(`🎉 New order: ${completeOrder.orderNumber}`, {
+          description: itemNames,
+          duration: 5000,
+        })
+      }
+    } catch (error) {
+      console.error("Exception during complete order fetch:", error)
+      // Fallback to minimal order
+      setOrders(prevOrders => {
+        const exists = prevOrders.some(order => order.id === newOrder.id)
+        if (exists) return prevOrders
+
+        const minimalOrder: OrderWithItems = {
+          id: newOrder.id,
+          orderNumber: newOrder.orderNumber,
+          userId: newOrder.userId,
+          status: newOrder.status || null,
+          totalAmount: newOrder.totalAmount,
+          floor: newOrder.floor || null,
+          customerName: newOrder.customerName || null,
+          customerPhone: newOrder.customerPhone || null,
+          notes: newOrder.notes || null,
+          estimatedCompletionTime: newOrder.estimatedCompletionTime || null,
+          completedAt: newOrder.completedAt || null,
+          createdAt: newOrder.createdAt || new Date().toISOString(),
+          updatedAt: newOrder.updatedAt || new Date().toISOString(),
+          orderItems: []
+        }
+
+        return [minimalOrder, ...prevOrders]
+      })
+    }
+  }, [])
+
+  const handleOrderUpdated = React.useCallback((updatedOrder: Schema["Order"]["type"]) => {
+    console.log("Real-time: Order updated", updatedOrder)
+
+    // Update the specific order in the list instead of full refresh
+    setOrders(prevOrders =>
+      prevOrders.map(order =>
+        order.id === updatedOrder.id
+          ? {
+            ...order,
+            status: updatedOrder.status || null,
+            totalAmount: updatedOrder.totalAmount,
+            floor: updatedOrder.floor || null,
+            customerName: updatedOrder.customerName || null,
+            customerPhone: updatedOrder.customerPhone || null,
+            notes: updatedOrder.notes || null,
+            estimatedCompletionTime: updatedOrder.estimatedCompletionTime || null,
+            completedAt: updatedOrder.completedAt || null,
+            updatedAt: updatedOrder.updatedAt || new Date().toISOString(),
+          }
+          : order
+      )
+    )
+
+    // Show notification for status changes
+    if (updatedOrder.status === "DONE") {
+      toast.success(`Order completed!`)
+    } else if (updatedOrder.status === "PENDING") {
+      toast.info(`Order marked as pending`)
+    }
+  }, [])
+
+  const handleOrderDeleted = React.useCallback((deletedOrder: Schema["Order"]["type"]) => {
+    setOrders(prevOrders => prevOrders.filter(order => order.id !== deletedOrder.id))
+    toast.error(`🗑️ Order deleted`, {
+      description: `${deletedOrder.orderNumber} has been removed`,
+      duration: 4000,
+    })
+  }, [])
+
+  // Setup real-time subscriptions with enhanced monitoring
+  const { isConnected } = useOrderSubscriptions({
+    onOrderCreated: handleOrderCreated,
+    onOrderUpdated: handleOrderUpdated,
+    onOrderDeleted: handleOrderDeleted,
+  })
+
 
   React.useEffect(() => {
     fetchData()
@@ -562,16 +782,6 @@ const Page = () => {
                     <p className="text-muted-foreground">
                       Manage customer orders and track their status
                     </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={handleRefresh}
-                      disabled={loading || isRefreshing}
-                    >
-                      <IconRefresh className="mr-2 h-4 w-4" />
-                      {isRefreshing ? "Refreshing..." : "Refresh"}
-                    </Button>
                   </div>
                 </div>
 

@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useAuthStore } from '@/lib/auth-store'
+import { useOrderSubscriptions } from "@/hooks/use-order-subscriptions"
 import {
   IconCalendar,
   IconClock,
@@ -93,11 +94,11 @@ interface OrderWithItems {
 }
 
 // Order Details Dialog Component
-function OrderDetailsDialog({ 
-  order, 
-  open, 
-  onOpenChange 
-}: { 
+function OrderDetailsDialog({
+  order,
+  open,
+  onOpenChange
+}: {
   order: OrderWithItems | null
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -269,9 +270,9 @@ function OrderDetailsDialog({
                     </div>
                   </div>
                 ))}
-                
+
                 <Separator />
-                
+
                 <div className="flex justify-between items-center font-bold text-lg">
                   <span>Total:</span>
                   <span>{formatPrice(order.totalAmount)}</span>
@@ -285,13 +286,14 @@ function OrderDetailsDialog({
   )
 }
 
-function OrderHistoryDataTable({ orders }: { 
+function OrderHistoryDataTable({ orders }: {
   orders: OrderWithItems[]
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+  const [globalFilter, setGlobalFilter] = React.useState("")
   const [selectedOrder, setSelectedOrder] = React.useState<OrderWithItems | null>(null)
   const [detailsOpen, setDetailsOpen] = React.useState(false)
 
@@ -356,6 +358,51 @@ function OrderHistoryDataTable({ orders }: {
       },
     },
     {
+      id: "items",
+      header: "Items",
+      accessorFn: (row) => {
+        // Create searchable string from order items
+        const itemNames = row.orderItems?.map(item => 
+          `${item.menuItem?.name} ${item.customizations || ''}`.trim()
+        ).join(' ') || ''
+        return itemNames
+      },
+      cell: ({ row }) => {
+        const order = row.original
+        const orderItems = order.orderItems || []
+        
+        if (orderItems.length === 0) {
+          return (
+            <div className="text-sm text-muted-foreground italic">
+              No items
+            </div>
+          )
+        }
+        
+        return (
+          <div className="max-w-48">
+            {orderItems.slice(0, 3).map((item) => (
+              <div key={item.id} className="text-sm">
+                <span className="font-medium">
+                  {item.quantity}x {item.menuItem?.name || 'Unknown item'}
+                </span>
+                {item.customizations && (
+                  <div className="text-xs text-muted-foreground ml-2">
+                    + {item.customizations}
+                  </div>
+                )}
+              </div>
+            ))}
+            {orderItems.length > 3 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                +{orderItems.length - 3} more items
+              </div>
+            )}
+          </div>
+        )
+      },
+    },
+    {
       accessorKey: "notes",
       header: "Notes",
       cell: ({ row }) => {
@@ -380,20 +427,6 @@ function OrderHistoryDataTable({ orders }: {
       },
     },
     {
-      id: "itemCount",
-      header: "Items",
-      cell: ({ row }) => {
-        const itemCount = row.original.orderItems?.length || 0
-        const totalQuantity = row.original.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0
-        return (
-          <div className="text-center">
-            <div className="font-medium">{totalQuantity}</div>
-            <div className="text-xs text-muted-foreground">{itemCount} types</div>
-          </div>
-        )
-      },
-    },
-    {
       accessorKey: "createdAt",
       header: "Order Date",
       cell: ({ row }) => {
@@ -412,6 +445,7 @@ function OrderHistoryDataTable({ orders }: {
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -423,6 +457,7 @@ function OrderHistoryDataTable({ orders }: {
       columnFilters,
       columnVisibility,
       rowSelection,
+      globalFilter,
     },
   })
 
@@ -431,11 +466,9 @@ function OrderHistoryDataTable({ orders }: {
       {/* Search and filters */}
       <div className="flex items-center gap-4">
         <Input
-          placeholder="Search by order number..."
-          value={(table.getColumn("orderNumber")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("orderNumber")?.setFilterValue(event.target.value)
-          }
+          placeholder="Search orders or items..."
+          value={globalFilter ?? ""}
+          onChange={(event) => setGlobalFilter(String(event.target.value))}
           className="max-w-sm"
         />
       </div>
@@ -452,9 +485,9 @@ function OrderHistoryDataTable({ orders }: {
                       {header.isPlaceholder
                         ? null
                         : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                     </TableHead>
                   )
                 })}
@@ -467,6 +500,11 @@ function OrderHistoryDataTable({ orders }: {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => {
+                    setSelectedOrder(row.original)
+                    setDetailsOpen(true)
+                  }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -553,9 +591,9 @@ const Page = () => {
       } else {
         setLoading(true)
       }
-      
+
       console.log("Fetching order history for user:", user.userId)
-      
+
       // Fetch orders for the current user
       const { data: ordersData, errors } = await client.models.Order.list({
         filter: { userId: { eq: user.userId } },
@@ -649,7 +687,7 @@ const Page = () => {
         )
 
         // Sort by creation date (newest first)
-        ordersWithItems.sort((a, b) => 
+        ordersWithItems.sort((a, b) =>
           new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
         )
 
@@ -669,6 +707,116 @@ const Page = () => {
   const handleRefresh = React.useCallback(() => {
     fetchData(true)
   }, [fetchData])
+
+  // Real-time subscription handlers (only for user's own orders)
+  const handleOrderCreated = React.useCallback(async (newOrder: Schema["Order"]["type"]) => {
+    // Only handle orders for the current user
+    if (newOrder.userId === user?.userId) {
+      console.log("Real-time: Your new order created", newOrder)
+      
+      // Fetch complete order data with items to show item names in toast
+      try {
+        const { data: ordersData } = await client.models.Order.list({
+          filter: { id: { eq: newOrder.id } },
+          selectionSet: [
+            'id',
+            'orderNumber',
+            'orderItems.id',
+            'orderItems.quantity',
+            'orderItems.menuItem.id',
+            'orderItems.menuItem.name',
+          ]
+        })
+
+        if (ordersData && ordersData.length > 0) {
+          const completeOrder = ordersData[0]
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const itemNames = completeOrder.orderItems?.map((item: any) => 
+            `${item.quantity}x ${item.menuItem?.name || 'Unknown item'}`
+          ).join(', ') || 'No items'
+
+          toast.success(`🎉 Order created successfully!`, {
+            description: itemNames,
+            duration: 5000,
+          })
+        } else {
+          // Fallback to order number
+          toast.success(`Your order ${newOrder.orderNumber} has been created!`)
+        }
+      } catch (error) {
+        console.error("Error fetching order items for toast:", error)
+        // Fallback to order number
+        toast.success(`Your order ${newOrder.orderNumber} has been created!`)
+      }
+      
+      // Refresh data to get the complete order with items
+      handleRefresh()
+    }
+  }, [user?.userId, handleRefresh])
+
+  const handleOrderUpdated = React.useCallback(async (updatedOrder: Schema["Order"]["type"]) => {
+    // Only handle orders for the current user
+    if (updatedOrder.userId === user?.userId) {
+      console.log("Real-time: Your order updated", updatedOrder)
+
+      handleRefresh()
+
+      // Fetch complete order data with items to show item names in toast
+      try {
+        const { data: ordersData } = await client.models.Order.list({
+          filter: { id: { eq: updatedOrder.id } },
+          selectionSet: [
+            'id',
+            'orderNumber',
+            'orderItems.id',
+            'orderItems.quantity',
+            'orderItems.menuItem.id',
+            'orderItems.menuItem.name',
+          ]
+        })
+
+        if (ordersData && ordersData.length > 0) {
+          const completeOrder = ordersData[0]
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const itemNames = completeOrder.orderItems?.map((item: any) => 
+            `${item.quantity}x ${item.menuItem?.name || 'Unknown item'}`
+          ).join(', ') || 'No items'
+
+          if (updatedOrder.status === "DONE") {
+            toast.success(`🎉 Your order is ready!`, {
+              description: itemNames,
+              duration: 6000,
+            })
+          } else if (updatedOrder.status === "PENDING") {
+            toast.info(`👨‍🍳 Your order is being prepared`, {
+              description: itemNames,
+              duration: 4000,
+            })
+          }
+        } else {
+          // Fallback to order number if we can't fetch items
+          if (updatedOrder.status === "DONE") {
+            toast.success(`Your order ${updatedOrder.orderNumber} is ready!`)
+          } else if (updatedOrder.status === "PENDING") {
+            toast.info(`Your order ${updatedOrder.orderNumber} is being prepared`)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching order items for toast:", error)
+        // Fallback to order number
+        if (updatedOrder.status === "DONE") {
+          toast.success(`Your order ${updatedOrder.orderNumber} is ready!`)
+        } else if (updatedOrder.status === "PENDING") {
+          toast.info(`Your order ${updatedOrder.orderNumber} is being prepared`)
+        }
+      }
+    }
+  }, [user?.userId, handleRefresh])
+
+  const { isConnected } = useOrderSubscriptions({
+    onOrderCreated: handleOrderCreated,
+    onOrderUpdated: handleOrderUpdated,
+  })
 
   React.useEffect(() => {
     fetchData()
@@ -727,16 +875,6 @@ const Page = () => {
                       View your past orders and track their status
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={handleRefresh}
-                      disabled={loading || isRefreshing}
-                    >
-                      <IconRefresh className="mr-2 h-4 w-4" />
-                      {isRefreshing ? "Refreshing..." : "Refresh"}
-                    </Button>
-                  </div>
                 </div>
 
                 {/* Order Statistics */}
@@ -757,15 +895,6 @@ const Page = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{formatPrice(orderStats.totalSpent)}</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                      <IconClock className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{orderStats.completedOrders}</div>
                     </CardContent>
                   </Card>
                   <Card>

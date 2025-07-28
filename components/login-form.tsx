@@ -21,7 +21,7 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
-  const { checkAuthState, fetchUserRoleFromToken } = useAuthStore();
+  const { checkAuthState, fetchUserRoleFromToken, fetchAndSetUserProfile } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -43,11 +43,23 @@ export function LoginForm({
         username: email,
         password: password,
       });
+      
       // Cập nhật auth state sau khi đăng nhập thành công
       await checkAuthState();
+      
       // Fetch user role từ access token
       await fetchUserRoleFromToken();
-      router.push("/dashboard");
+      
+      // Fetch user profile và lưu vào store - đợi để hoàn thành trước khi navigate
+      const profile = await fetchAndSetUserProfile();
+      
+      if (profile) {
+        console.log('Profile loaded successfully, navigating to dashboard');
+        router.push("/dashboard");
+      } else {
+        console.log('Profile not loaded, but continuing to dashboard');
+        router.push("/dashboard");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");
     } finally {

@@ -85,7 +85,6 @@ export function LoginForm({
         username: email,
         confirmationCode: confirmationCode,
       });
-      // After confirmation, sign in automatically
       await signIn({
         username: email,
         password: password,

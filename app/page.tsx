@@ -23,7 +23,6 @@ export default function Home() {
     router.push('/dashboard');
   };
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -32,7 +31,6 @@ export default function Home() {
     );
   }
 
-  // Nếu đã authenticated thì không hiển thị gì (sẽ redirect)
   if (isAuthenticated) {
     return null;
   }

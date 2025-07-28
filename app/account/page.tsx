@@ -37,6 +37,7 @@ import {
 } from "@tabler/icons-react"
 import { useAuthStore } from "@/lib/auth-store"
 import { toast } from "sonner"
+import { useState } from "react"
 
 const client = generateClient<Schema>()
 
@@ -54,23 +55,20 @@ const AccountPage = () => {
     favoriteItems: 0,
     memberLevel: "Bronze"
   })
-  const [userInfo, setUserInfo] = React.useState({
+  const [userInfo, setUserInfo] = useState({
     name: "",
     email: user?.signInDetails?.loginId || "",
     phone: "",
     role: "USER" as "ADMIN" | "USER",
     joinDate: "Unknown",
-    avatar: "/avatars/user.jpg"
   })
 
-  // Fetch user's order statistics
   const fetchOrderStats = React.useCallback(async () => {
     if (!user?.userId) return
 
     try {
       console.log("Fetching order statistics for:", user.userId)
       
-      // Fetch user's orders
       const { data: orders } = await client.models.Order.list({
         filter: { userId: { eq: user.userId } }
       })
@@ -100,7 +98,6 @@ const AccountPage = () => {
     }
   }, [user?.userId])
 
-  // Fetch user profile from database
   const fetchUserProfile = React.useCallback(async () => {
     if (!user?.userId) {
       setLoading(false)
@@ -128,11 +125,9 @@ const AccountPage = () => {
             year: 'numeric', 
             month: 'long' 
           }) : "Unknown",
-          avatar: "/avatars/user.jpg"
         })
         console.log("User profile found:", profile)
       } else {
-        // Create new user profile if doesn't exist
         console.log("No user profile found, creating new one")
         const { data: newProfile, errors } = await client.models.UserProfile.create({
           userId: user.userId,
@@ -155,7 +150,6 @@ const AccountPage = () => {
               year: 'numeric', 
               month: 'long' 
             }) : "Unknown",
-            avatar: "/avatars/user.jpg"
           })
           console.log("New user profile created:", newProfile)
         }

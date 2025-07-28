@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
 import { AmplifyProvider } from "@/lib/amplify-provider";
 import { AuthInitializer } from "@/lib/auth-initializer";
-import { Toaster } from "@/components/ui/sonner";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
+import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BiCafe - Order Management",
-  description: "Cafe order management system",
+  title: "Bicaf project",
+  description: "Good cafe for everyone",
 };
 
 export default function RootLayout({

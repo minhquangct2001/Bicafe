@@ -875,7 +875,7 @@ const ProductPage = () => {
   }, [fetchData])
 
   return (
-    <ProtectedRoute requireAuth={true} allowedRoles={['ADMIN']}>
+    <ProtectedRoute requireAuth={true}>
       <SidebarProvider
         style={
           {
@@ -898,14 +898,6 @@ const ProductPage = () => {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={handleRefresh}
-                      disabled={loading || isRefreshing}
-                    >
-                      <IconRefresh className="mr-2 h-4 w-4" />
-                      {isRefreshing ? "Refreshing..." : "Refresh"}
-                    </Button>
                     <AddMenuItemDialog 
                       categories={categories} 
                       onSuccess={() => fetchData(true)} 
