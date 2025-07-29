@@ -71,6 +71,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           url: "/revenue",
           icon: IconChartBar,
         },
+        {
+          title: "Unpaid Orders",
+          url: "/unpaid",
+          icon: IconChartBar,
+        },
       ];
     } else if (userRole === 'USER') {
       return [

@@ -29,6 +29,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
     IconSearch,
@@ -62,6 +69,9 @@ const checkoutSchema = z.object({
   customerPhone: z.string().min(1, "Phone number is required"),
   floor: z.string().optional(),
   notes: z.string().optional(),
+  paymentMethod: z.enum(["PREPAID", "POSTPAID"], {
+    required_error: "Please select a payment method",
+  }),
 })
 
 type CheckoutFormData = z.infer<typeof checkoutSchema>
@@ -123,6 +133,7 @@ function CheckoutDialog({
       customerPhone: "",
       floor: "",
       notes: "",
+      paymentMethod: "PREPAID",
     },
   })
 
@@ -195,6 +206,8 @@ function CheckoutDialog({
         customerName: data.customerName,
         customerPhone: data.customerPhone,
         notes: data.notes || "",
+        paymentMethod: data.paymentMethod,
+        paymentStatus: data.paymentMethod === "PREPAID" ? "PAID" : "UNPAID",
       })
 
       if (orderErrors) {
@@ -328,6 +341,44 @@ function CheckoutDialog({
                   <FormControl>
                     <Input placeholder="Enter floor number" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="paymentMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Method</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="PREPAID">
+                        <div className="flex items-center gap-2">
+                          <IconCreditCard className="w-4 h-4" />
+                          <div>
+                            <div className="font-medium">Prepaid</div>
+                            <div className="text-xs text-muted-foreground">Pay now</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="POSTPAID">
+                        <div className="flex items-center gap-2">
+                          <IconCreditCard className="w-4 h-4" />
+                          <div>
+                            <div className="font-medium">Postpaid</div>
+                            <div className="text-xs text-muted-foreground">Pay later</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

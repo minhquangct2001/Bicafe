@@ -21,12 +21,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  IconRefresh,
   IconEye,
   IconPhone,
   IconCheck,
   IconCircleCheckFilled,
-  IconLoader
+  IconLoader,
+  IconCreditCard
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 import {
@@ -69,6 +69,8 @@ interface OrderWithItems {
   notes: string | null
   estimatedCompletionTime: string | null
   completedAt: string | null
+  paymentMethod: string | null
+  paymentStatus: string | null
   createdAt: string
   updatedAt: string
   orderItems?: Array<{
@@ -173,6 +175,42 @@ function OrdersDataTable({ orders, onRefresh }: {
             )}
             {status}
           </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "paymentMethod",
+      header: "Payment",
+      cell: ({ row }) => {
+        const paymentMethod = row.getValue("paymentMethod") as string
+        const paymentStatus = row.original.paymentStatus as string
+
+        if (!paymentMethod) {
+          return (
+            <Badge variant="secondary" className="text-xs">
+              Not Set
+            </Badge>
+          )
+        }
+
+        return (
+          <div className="flex flex-col gap-1">
+            <Badge 
+              variant={paymentMethod === "PREPAID" ? "default" : "outline"} 
+              className="text-xs w-fit"
+            >
+              <IconCreditCard className="w-3 h-3 mr-1" />
+              {paymentMethod === "PREPAID" ? "Prepaid" : "Postpaid"}
+            </Badge>
+            {paymentStatus && (
+              <Badge 
+                variant={paymentStatus === "PAID" ? "default" : "destructive"} 
+                className="text-xs w-fit"
+              >
+                {paymentStatus === "PAID" ? "Paid" : "Unpaid"}
+              </Badge>
+            )}
+          </div>
         )
       },
     },
@@ -468,6 +506,8 @@ const Page = () => {
           'notes',
           'estimatedCompletionTime',
           'completedAt',
+          'paymentMethod',
+          'paymentStatus',
           'createdAt',
           'updatedAt',
           'orderItems.id',
@@ -507,6 +547,8 @@ const Page = () => {
           notes: order.notes || null,
           estimatedCompletionTime: order.estimatedCompletionTime || null,
           completedAt: order.completedAt || null,
+          paymentMethod: order.paymentMethod || null,
+          paymentStatus: order.paymentStatus || null,
           createdAt: order.createdAt || new Date().toISOString(),
           updatedAt: order.updatedAt || new Date().toISOString(),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -569,6 +611,8 @@ const Page = () => {
           'notes',
           'estimatedCompletionTime',
           'completedAt',
+          'paymentMethod',
+          'paymentStatus',
           'createdAt',
           'updatedAt',
           'orderItems.id',
@@ -602,6 +646,8 @@ const Page = () => {
             notes: newOrder.notes || null,
             estimatedCompletionTime: newOrder.estimatedCompletionTime || null,
             completedAt: newOrder.completedAt || null,
+            paymentMethod: null,
+            paymentStatus: null,
             createdAt: newOrder.createdAt || new Date().toISOString(),
             updatedAt: newOrder.updatedAt || new Date().toISOString(),
             orderItems: []
@@ -629,6 +675,8 @@ const Page = () => {
           notes: completeOrderData.notes || null,
           estimatedCompletionTime: completeOrderData.estimatedCompletionTime || null,
           completedAt: completeOrderData.completedAt || null,
+          paymentMethod: completeOrderData.paymentMethod || null,
+          paymentStatus: completeOrderData.paymentStatus || null,
           createdAt: completeOrderData.createdAt || new Date().toISOString(),
           updatedAt: completeOrderData.updatedAt || new Date().toISOString(),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -691,6 +739,8 @@ const Page = () => {
           notes: newOrder.notes || null,
           estimatedCompletionTime: newOrder.estimatedCompletionTime || null,
           completedAt: newOrder.completedAt || null,
+          paymentMethod: null,
+          paymentStatus: null,
           createdAt: newOrder.createdAt || new Date().toISOString(),
           updatedAt: newOrder.updatedAt || new Date().toISOString(),
           orderItems: []
@@ -718,6 +768,8 @@ const Page = () => {
             notes: updatedOrder.notes || null,
             estimatedCompletionTime: updatedOrder.estimatedCompletionTime || null,
             completedAt: updatedOrder.completedAt || null,
+            paymentMethod: updatedOrder.paymentMethod || order.paymentMethod,
+            paymentStatus: updatedOrder.paymentStatus || order.paymentStatus,
             updatedAt: updatedOrder.updatedAt || new Date().toISOString(),
           }
           : order
@@ -741,7 +793,7 @@ const Page = () => {
   }, [])
 
   // Setup real-time subscriptions with enhanced monitoring
-  const { isConnected } = useOrderSubscriptions({
+  useOrderSubscriptions({
     onOrderCreated: handleOrderCreated,
     onOrderUpdated: handleOrderUpdated,
     onOrderDeleted: handleOrderDeleted,

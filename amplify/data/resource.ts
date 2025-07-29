@@ -63,6 +63,8 @@ const schema = a.schema({
       notes: a.string(),
       estimatedCompletionTime: a.datetime(),
       completedAt: a.datetime(),
+      paymentMethod: a.enum(["PREPAID", "POSTPAID"]),
+      paymentStatus: a.enum(["PAID", "UNPAID"]),
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
       orderItems: a.hasMany("OrderItem", "orderId"),
